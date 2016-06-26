@@ -232,3 +232,6 @@ class LLNLDBClient(object):
             st.append(tr)
 
         return st
+
+    def list_events(self):
+        return list(self._events.keys())
