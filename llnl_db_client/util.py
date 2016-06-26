@@ -7,7 +7,7 @@
     GNU Lesser General Public License, Version 3
     (http://www.gnu.org/copyleft/lgpl.html)
 """
-from __future__ import absolute_import
+from __future__ import absolute_import, division, print_function
 
 import collections
 
@@ -27,6 +27,8 @@ def to_dataframe(filename, definition):
 
         for name, indices, type in definition:
             item[name] = type(line[indices[0]:indices[1]])
+            if type == str:
+                item[name] = item[name].strip()
 
         items.append(item)
 

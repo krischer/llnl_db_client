@@ -11,6 +11,7 @@ Implementation of the client.
 """
 from __future__ import absolute_import, division, print_function
 
+import io
 import os
 import re
 import warnings
@@ -19,42 +20,17 @@ import numpy as np
 import pandas as pd
 
 import obspy
-from obspy.clients.base import BaseClient
+from obspy.core.compatibility import from_buffer
 
 from . import util
 
-DTYPE = {
-    # Big-endian integers
-    's4': '>i',
-    's2': '>h',
-    # Little-endian integers
-    'i4': '<i',
-    'i2': '<h',
-    # ASCII integers
-    'c0': ('S12', np.int),
-    'c#': ('S12', np.int),
-    # Big-endian floating point
-    't4': '>f',
-    't8': '>d',
-    # Little-endian floating point
-    'f4': '<f',
-    'f8': '<d',
-    # ASCII floating point
-    'a0': ('S15', np.float32),
-    'a#': ('S15', np.float32),
-    'b0': ('S24', np.float64),
-    'b#': ('S24', np.float64),
-}
 
-
-class LLNLDBClient(BaseClient):
-    def __init__(self, wfdisc, debug=False):
+class LLNLDBClient(object):
+    def __init__(self, wfdisc):
         """
         :param wfdisc: Path to the wfdisc file. Must be an existing filename.
         :type wfdisc: str
         """
-        BaseClient.__init__(self, debug=debug)
-
         wfdisc = os.path.normpath(os.path.abspath(wfdisc))
 
         assert os.path.exists(wfdisc), "'%s' does not exist" % wfdisc
@@ -69,6 +45,7 @@ class LLNLDBClient(BaseClient):
         self._assemble_filenames()
         self._parse_wf_disc_file()
         self._parse_site_file()
+        self._parse_events()
 
     def __str__(self):
         ret_str = "LLNL Database '%s' (%s)\n" % (self._db_name, self._basedir)
@@ -114,7 +91,7 @@ class LLNLDBClient(BaseClient):
             item["channel"] = line[7:15].strip()
             item["starttime"] = obspy.UTCDateTime(float(line[16:33]))
 
-            item["unknown_a"] = int(line[35:44].strip())
+            item["id"] = int(line[35:44].strip())
             item["unknown_b"] = int(line[46:51].strip())
             item["unknown_c"] = int(line[53:62].strip())
             item["unknown_d"] = float(line[63:80].strip())
@@ -133,10 +110,6 @@ class LLNLDBClient(BaseClient):
                     "File '%s' does not exists. "
                     "Will not be accessible via the client.", UserWarning)
                 continue
-
-            item["offset"] = int(line[246:256])
-            item["dtype"] = DTYPE[line[143:145]]
-            item["read_fmt"] = np.dtype(item["dtype"])
             items.append(item)
 
         self._dataframes["wfdisc"] = pd.DataFrame(items)
@@ -176,3 +149,86 @@ class LLNLDBClient(BaseClient):
 
         self._dataframes["site"] = \
             util.to_dataframe(self._files["site"], definition)
+
+    def get_waveforms_for_event(self, event_id):
+        pass
+
+    def _parse_events(self):
+        # Step 1: Get list of events.
+        with open(self._files["evids"], "rt") as fh:
+            event_ids = set(int(_i.strip()) for _i in fh.readlines())
+
+        # Step 2: Get event types.
+        with open(self._files["etype"], "rt") as fh:
+            event_type = {
+                int(_j[0]): _j[1] for _j in
+                (_i.strip().split() for _i in fh.readlines())}
+
+        assert set(event_type.keys()) == event_ids
+
+        # Step 3: Parse the event file.
+        definition = [
+            ("event_id", (0, 8), int),
+            ("location", (9, 25), str),
+            ("unknown_a", (26, 33), int),
+            ("unknown_b", (34, 55), str),
+            ("unknown_c", (56, 58), int),
+            ("date", (59, 70), str)
+        ]
+
+        event_info = util.to_dataframe(self._files["event"], definition)
+        assert set(event_info["event_id"]) == event_ids
+
+        # Step 4: Parse the tags but only keep the event associations for now.
+        definition = [
+            ("type", (0, 4), str),
+            ("id", (6, 18), int),
+            ("waveform_id", (19, 26), int),
+            ("date", (27, 36), str)
+        ]
+        tags = util.to_dataframe(self._files["wftag"], definition)
+        tags = tags[tags.type == "evid"]
+
+        # Make sure all events have associations.
+        assert set(tags.id) == event_ids
+
+        # Assemble all the information in some fashion for now.
+        self._events = {}
+        for ev_id in event_ids:
+            ev = event_info[event_info.event_id == ev_id].iloc[0]
+
+            self._events[ev_id] = {
+                "location": ev.location,
+                "unknown_a": ev.unknown_a,
+                "unknown_b": ev.unknown_b,
+                "unknown_c": ev.unknown_c,
+                "date": ev.date,
+                "waveform_ids": list(tags[tags.id == ev_id].waveform_id)
+            }
+
+    def get_waveforms_for_event(self, event_id):
+        wf_ids = self._events[event_id]["waveform_ids"]
+        _t = self._dataframes["wfdisc"]
+
+        st = obspy.Stream()
+
+        for wf in wf_ids:
+            wf = _t[_t.id == wf].iloc[0]
+
+            with io.open(wf.filename, "rb") as fh:
+                data = fh.read(4 * wf.npts)
+
+            data = from_buffer(data, dtype=np.float32)
+            # Data is big-endian - we just want to work with little endian.
+            data.byteswap(True)
+
+            tr = obspy.Trace(data=data)
+            tr.stats.station = wf.station
+            tr.stats.sampling_rate = wf.sampling_rate
+            tr.stats.starttime = wf.starttime
+            tr.stats.channel = wf.channel.upper()
+            tr.stats.calib = wf.calib
+
+            st.append(tr)
+
+        return st
