@@ -290,8 +290,171 @@ class LLNLDBClient(object):
         sensors = collections.defaultdict(list)
         for _, s in sensor.iterrows():
             inst = instrument[instrument.id == s.instrument_id].iloc[0]
-            sensors[(s.station, s.channel)].append(Sensor(
+            sensors[(s.station, s.channel.upper())].append(Sensor(
                 s.starttime, s.endtime, s.instrument_id, inst.response_type,
                 all_files[inst.filename]))
 
         self.sensors = sensors
+
+    def remove_response(self, tr, output="VEL", water_level=60, pre_filt=None):
+        """
+        Remove the response of the passed waveform trace or stream.
+
+        The passed arguments are documented in more detail in the main ObsPy
+        package. No tapering or detrending is performed - the user is
+        responsible for it.
+
+        :param tr: Stream or Trace object whose instrument response(s) will be
+            removed in-place.
+        :type tr: :class:`obspy.core.trace.Trace` or
+            :class:`obspy.core.stream.Stream`
+        :param output: The output units. One of ``"DISP"``, ``"VEL"``,
+            ``"ACC"``
+        :param water_level: The water level.
+        :param pre_filt: Frequency domain pre-filter.
+        """
+        assert output in ["DISP", "VEL", "ACC"]
+
+        if isinstance(tr, obspy.Stream):
+            for i in tr:
+                self.remove_response(
+                    i, output=output, water_level=water_level,
+                    pre_filt=pre_filt)
+            return
+
+        # Step 1: Find the corresponding response.
+        assert (tr.stats.station, tr.stats.channel) in self.sensors, \
+            "No response for station '%s' and channel '%s' found." % (
+                tr.stats.station, tr.stats.channel)
+
+        sensor = self.sensors[(tr.stats.station, tr.stats.channel)]
+
+        time = tr.stats.starttime + \
+            (tr.stats.endtime - tr.stats.starttime) / 2.0
+
+        for epoch in sensor:
+            if epoch.starttime <= time <= epoch.endtime:
+                break
+        else:
+            raise ValueError("Found some responses for the channel but not "
+                             "for the correct time span.")
+
+        # Step 2: Actually correct the data.
+        #
+        # Case 1: sacpz files.
+        if epoch.response_type == "sacpzf":
+            with io.open(epoch.filename, "rt") as fh:
+                cur_state = None
+                poles = []
+                zeros = []
+                for line in fh:
+                    line = line.strip()
+                    if line.startswith("*"):
+                        continue
+
+                    l = line.split()
+                    if l[0].upper() == "ZEROS":
+                        cur_state = "ZEROS"
+                        num_zeros = int(l[1])
+                    elif l[0].upper() == "POLES":
+                        cur_state = "POLES"
+                        num_poles = int(l[1])
+                    elif l[0].upper() == "CONSTANT":
+                        constant = float(l[1])
+                    elif cur_state:
+                        v = float(l[0]) + float(l[1]) * 1j
+                        if cur_state == "ZEROS":
+                            zeros.append(v)
+                        elif cur_state == "POLES":
+                            poles.append(v)
+                        else:
+                            raise NotImplementedError
+                    else:
+                        raise NotImplementedError
+
+            assert len(poles) == num_poles, "sacpz parsing error"
+            assert len(zeros) == num_zeros, "sacpz parsing error"
+            assert constant, "sacpz parsing error"
+
+            paz = {"poles": poles, "zeros": zeros, "gain": 1.0,
+                   "sensitivity": constant}
+
+            # Assume they correct to velocity.
+            if output == "DISP":
+                paz["zeros"].append(0 + 0j)
+            elif output == "ACC":
+                paz["zeros"] = paz["zeros"][:-1]
+
+            tr.simulate(paz_remove=paz, water_level=water_level,
+                        zero_mean=False, taper=False,
+                        pre_filt=pre_filt)
+
+        # Case 2: RESP files.
+        elif epoch.response_type == "evresp":
+            tr.simulate(seedresp={"units": output,
+                                  "filename": epoch.filename},
+                        water_level=water_level,
+                        zero_mean=False, taper=False,
+                        pre_filt=pre_filt)
+
+        # Case 3: Funky response/paz files.
+        elif epoch.response_type == "paz":
+            with io.open(epoch.filename, "rt") as fh:
+                lines = [_i.strip() for _i in fh.readlines()]
+            lines = [_i for _i in lines if not _i.startswith("#")]
+
+            paz_sets = []
+            cur_set = None
+            cur_status = None
+
+            for line in lines:
+                if line.startswith("theoretical"):
+                    if cur_set:
+                        paz_sets.append(cur_set)
+                    cur_set = {"poles": [], "zeros": []}
+                    paz_sets.append(cur_set)
+                    cur_status = None
+                    continue
+
+                line = line.split()
+
+                if len(line) == 2:
+                    cur_set["sensitivity"] = float(line[0])
+                    continue
+                elif len(line) == 1:
+                    if cur_status is None:
+                        cur_status = "poles"
+                    elif cur_status == "poles":
+                        cur_status = "zeros"
+                    else:
+                        raise NotImplementedError
+                    continue
+                elif len(line) == 4:
+                    v = float(line[0]) + float(line[1]) * 1j
+                    if cur_status == "poles":
+                        cur_set["poles"].append(v)
+                    elif cur_status == "zeros":
+                        cur_set["zeros"].append(v)
+                    else:
+                        raise NotImplementedError
+                else:
+                    raise NotImplementedError
+
+            paz = paz_sets[0]
+            for p in paz_sets[1:]:
+                paz["sensitivity"] *= p["sensitivity"]
+            paz["gain"] = 1.0
+
+            # Assume they correct to velocity.
+            if output == "DISP":
+                paz["zeros"].append(0 + 0j)
+            elif output == "ACC":
+                paz["zeros"] = paz["zeros"][:-1]
+
+            tr.simulate(paz_remove=paz, water_level=water_level,
+                        zero_mean=False, taper=False,
+                        pre_filt=pre_filt)
+        else:
+            raise NotImplementedError(
+                "Unknown response type '%s' for file '%s'." % (
+                    epoch.response_type, epoch.filename))
