@@ -11,6 +11,7 @@ Implementation of the client.
 """
 from __future__ import absolute_import, division, print_function
 
+import collections
 import io
 import os
 import re
@@ -46,6 +47,7 @@ class LLNLDBClient(object):
         self._parse_wf_disc_file()
         self._parse_site_file()
         self._parse_events()
+        self._parse_sensor_information()
 
     def __str__(self):
         ret_str = "LLNL Database '%s' (%s)\n" % (self._db_name, self._basedir)
@@ -150,9 +152,6 @@ class LLNLDBClient(object):
         self._dataframes["site"] = \
             util.to_dataframe(self._files["site"], definition)
 
-    def get_waveforms_for_event(self, event_id):
-        pass
-
     def _parse_events(self):
         # Step 1: Get list of events.
         with open(self._files["evids"], "rt") as fh:
@@ -235,3 +234,64 @@ class LLNLDBClient(object):
 
     def list_events(self):
         return list(self._events.keys())
+
+    def _parse_sensor_information(self):
+        # Step 1: Parse the sensor file - we just need this to get the
+        # instrument id for each channel.
+        definition = [
+            ("station", (0, 6), str),
+            ("channel", (7, 14), str),
+            ("starttime", (15, 33), lambda x: obspy.UTCDateTime(float(x))),
+            ("endtime", (34, 52), lambda x: obspy.UTCDateTime(float(x))),
+            ("instrument_id", (53, 61), int),
+            ("unknown_c", (62, 70), int),
+            ("unknown_d", (71, 82), int),
+            ("unknown_e", (83, 101), float),
+            ("unknown_f", (102, 113), float),
+            ("unknown_g", (114, 119), float),
+            ("unknown_h", (120, 121), str),
+            ("date", (122, 132), str)
+        ]
+        sensor = util.to_dataframe(self._files["sensor"], definition)
+
+        # Step 2: Parse the instrument information to get the filename and the
+        # type of response.
+        definition = [
+            ("id", (0, 8), int),
+            ("description", (9, 58), str),
+            ("unknown_a", (59, 61), str),
+            ("unknown_b", (62, 66), str),
+            ("unknown_c", (67, 68), str),
+            ("unknown_d", (69, 70), str),
+            ("unknown_e", (71, 86), float),
+            ("unknown_f", (87, 105), float),
+            ("unknown_g", (106, 116), float),
+            ("unknown_h", (117, 180), str),
+            ("filename", (181, 213), str),
+            ("response_type", (214, 221), str),
+            ("data", (222, 232), str)
+        ]
+        instrument = util.to_dataframe(self._files["instrument"], definition)
+
+        # Step 3: Find the actual filenames of all responses and match.
+        responses_dir = os.path.join(self._basedir, "responses")
+        all_files = {}
+        for root, _, files in os.walk(responses_dir):
+            for filename in files:
+                assert filename not in all_files
+                all_files[filename] = \
+                    os.path.abspath(os.path.join(root, filename))
+
+        Sensor = collections.namedtuple(
+            "Sensor", ["starttime", "endtime", "id", "response_type",
+                       "filename"])
+
+        # Step 4: Merge it all.
+        sensors = collections.defaultdict(list)
+        for _, s in sensor.iterrows():
+            inst = instrument[instrument.id == s.instrument_id].iloc[0]
+            sensors[(s.station, s.channel)].append(Sensor(
+                s.starttime, s.endtime, s.instrument_id, inst.response_type,
+                all_files[inst.filename]))
+
+        self.sensors = sensors
