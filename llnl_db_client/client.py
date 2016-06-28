@@ -376,14 +376,26 @@ class LLNLDBClient(object):
             assert len(zeros) == num_zeros, "sacpz parsing error"
             assert constant, "sacpz parsing error"
 
-            paz = {"poles": poles, "zeros": zeros, "gain": 1.0,
-                   "sensitivity": constant}
+            # XXX: This is a wild guess - it guesses they correct to
+            # displacment in micrometer - the only justification for this is
+            # that I looked at the seismograms corrected with RESP files and
+            # this puts the amplitudes in the same ballpark.
+            constant *= 1E6
 
-            # Assume they correct to velocity.
+            paz = {"poles": poles, "zeros": zeros, "gain": constant,
+                   "sensitivity": 1.0}
+
+            # Assume they correct to displacement. Adding a zero effectively
+            # differentiates.
             if output == "DISP":
+                pass
+            elif output == "VEL":
                 paz["zeros"].append(0 + 0j)
             elif output == "ACC":
-                paz["zeros"] = paz["zeros"][:-1]
+                paz["zeros"].append(0 + 0j)
+                paz["zeros"].append(0 + 0j)
+            else:
+                raise NotImplementedError
 
             tr.simulate(paz_remove=paz, water_level=water_level,
                         zero_mean=False, taper=False,
@@ -419,7 +431,7 @@ class LLNLDBClient(object):
                 line = line.split()
 
                 if len(line) == 2:
-                    cur_set["sensitivity"] = float(line[0])
+                    cur_set["gain"] = float(line[0])
                     continue
                 elif len(line) == 1:
                     if cur_status is None:
@@ -442,14 +454,27 @@ class LLNLDBClient(object):
 
             paz = paz_sets[0]
             for p in paz_sets[1:]:
-                paz["sensitivity"] *= p["sensitivity"]
-            paz["gain"] = 1.0
+                paz["gain"] *= p["gain"]
+            paz["sensitivity"] = 1.0
 
-            # Assume they correct to velocity.
+            # XXX: This is a wild guess - it guesses they correct to
+            # displacment in 1E5 meters for whatever reason - the only
+            # justification for this is that I looked at the seismograms
+            # corrected with RESP files and this puts the amplitudes in the
+            # same ballpark.
+            paz["gain"] *= 1E-5
+
+            # Assume they correct to displacement. Adding a zero effectively
+            # differentiates.
             if output == "DISP":
+                pass
+            elif output == "VEL":
                 paz["zeros"].append(0 + 0j)
             elif output == "ACC":
-                paz["zeros"] = paz["zeros"][:-1]
+                paz["zeros"].append(0 + 0j)
+                paz["zeros"].append(0 + 0j)
+            else:
+                raise NotImplementedError
 
             tr.simulate(paz_remove=paz, water_level=water_level,
                         zero_mean=False, taper=False,

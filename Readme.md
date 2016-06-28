@@ -22,7 +22,15 @@ within the repository.
 
 ### Potential Pitfalls
 
-* Essentially untested
+* Essentially untested.
+* The reponses are a bit tricky, except the RESP files which are easy. The others follow this logic:
+	* SACPZ files:
+    	* The are specified to correct to `M` (displacement) which is what the IRIS web services do when returning sacpz files.
+        * The gain in `sacpz` files is defined as `seismometer_gain * digitizer_gain * A0*
+	* Funky PAZ files:
+		* Correct to displacement
+
+
 * Currently assumes the sacpz and other paz files correct to velocity. Is this specified somewhere?
 * I'm not sure the `paz` type response files (e.g. not RESP nor SACPZ) are correctly handled as I don't know the specification. It currently uses only the first set of poles and zeros but uses the sensitivity from all stations.
 * There is something wrong with the sensitivities? Probably just need a couple of careful checks.
