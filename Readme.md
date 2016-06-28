@@ -20,6 +20,13 @@ $ pip install -v -e .
 
 within the repository.
 
+### Potential Pitfalls
+
+* Essentially untested
+* Currently assumes the sacpz and other paz files correct to velocity. Is this specified somewhere?
+* I'm not sure the `paz` type response files (e.g. not RESP nor SACPZ) are correctly handled as I don't know the specification. It currently uses only the first set of poles and zeros but uses the sensitivity from all stations.
+* There is something wrong with the sensitivities? Probably just need a couple of careful checks.
+
 ### Usage
 
 First initialize a client:
@@ -62,6 +69,18 @@ Get an ObsPy `Stream` object with all waveforms for an event:
 
 [Use "print(Stream.__str__(extended=True))" to print all Traces]
 ```
+
+Instrument correction.
+
+```python
+# Has to be done manually!
+st.detrend("linear")
+st.taper(max_percentage=0.05, type="hann")
+
+# Water level, output, and pre_filt are the same as in Trace.remove_response()
+c.remove_response(st, water_level=10, output="VEL", pre_filt=None)
+```
+
 
 Plot a map of all available stations:
 
