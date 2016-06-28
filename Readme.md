@@ -13,7 +13,7 @@ $ pip install -v -e .
 
 If you ever want to update the installation, just run
 
-```python
+```bash
 $ git pull
 $ pip install -v -e .
 ```
