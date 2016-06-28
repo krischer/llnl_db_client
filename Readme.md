@@ -23,17 +23,11 @@ within the repository.
 ### Potential Pitfalls
 
 * Essentially untested.
-* The reponses are a bit tricky, except the RESP files which are easy. The others follow this logic:
+* The reponses are a bit tricky, except the RESP files which are easy. The others follow this logic (**this might very well be wrong!!!**):
 	* SACPZ files:
-    	* The are specified to correct to `M` (displacement) which is what the IRIS web services do when returning sacpz files.
-        * The gain in `sacpz` files is defined as `seismometer_gain * digitizer_gain * A0*
+		* The client currently assumes they correct to displacement in 10E-6 meters! The only justification I have is that this puts the amplitudes in the same ballpark as those corrected for with evalresp.
 	* Funky PAZ files:
-		* Correct to displacement
-
-
-* Currently assumes the sacpz and other paz files correct to velocity. Is this specified somewhere?
-* I'm not sure the `paz` type response files (e.g. not RESP nor SACPZ) are correctly handled as I don't know the specification. It currently uses only the first set of poles and zeros but uses the sensitivity from all stations.
-* There is something wrong with the sensitivities? Probably just need a couple of careful checks.
+		* The client currently assumes they correct to displacement in 10E5 meters! The only justification I have is that this puts the amplitudes in the same ballpark as those corrected for with evalresp.
 
 ### Usage
 
