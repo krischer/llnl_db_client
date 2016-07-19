@@ -205,6 +205,11 @@ class LLNLDBClient(object):
                 "waveform_ids": list(tags[tags.id == ev_id].waveform_id)
             }
 
+    def get_unique_channels(self):
+        return set((_i[1].station.upper(),
+                    _i[1].channel.upper()) for _i in
+                   self._dataframes["wfdisc"].iterrows())
+
     def get_waveforms_for_event(self, event_id):
         wf_ids = self._events[event_id]["waveform_ids"]
         _t = self._dataframes["wfdisc"]
@@ -290,7 +295,7 @@ class LLNLDBClient(object):
         sensors = collections.defaultdict(list)
         for _, s in sensor.iterrows():
             inst = instrument[instrument.id == s.instrument_id].iloc[0]
-            sensors[(s.station, s.channel.upper())].append(Sensor(
+            sensors[(s.station.upper(), s.channel.upper())].append(Sensor(
                 s.starttime, s.endtime, s.instrument_id, inst.response_type,
                 all_files[inst.filename]))
 
