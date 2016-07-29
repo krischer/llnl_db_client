@@ -116,7 +116,7 @@ class LLNLDBClient(object):
 
         self._dataframes["wfdisc"] = pd.DataFrame(items)
 
-    def plot_stations(self):
+    def get_inventory(self):
         _t = self._dataframes["site"]
 
         net = obspy.core.inventory.Network(code="LL")
@@ -128,7 +128,10 @@ class LLNLDBClient(object):
                     latitude=sta["latitude"],
                     longitude=sta["longitude"],
                     elevation=sta["elevation_in_km"] * 1000.0))
-        inv.plot(projection="local")
+        return inv
+
+    def plot_stations(self):
+        self.get_inventory().plot(projection="local")
 
     def _parse_site_file(self):
         """
@@ -202,8 +205,40 @@ class LLNLDBClient(object):
                 "unknown_b": ev.unknown_b,
                 "unknown_c": ev.unknown_c,
                 "date": ev.date,
-                "waveform_ids": list(tags[tags.id == ev_id].waveform_id)
+                "waveform_ids": list(tags[tags.id == ev_id].waveform_id),
+                "origins": {}
             }
+
+        # Also parse all the origins.
+        definition = [
+            ("latitude", (0, 9), float),
+            ("longitude", (10, 18), float),
+            ("depth_in_km", (19, 29), float),
+            ("event_id", (58, 66), int),
+            ("agency", (193, 207), str)
+        ]
+
+        origins = util.to_dataframe(self._files["origin"], definition)
+        missed_events = set()
+        for i, row in origins.iterrows():
+            # The database is just really incomplete :-(
+            if row.event_id not in event_ids:
+                missed_events.add(row.event_id)
+                continue
+
+            self._events[row.event_id]["origins"][row.agency] = {
+                "latitude": row.latitude,
+                "longitude": row.longitude,
+                "depth_in_m": row.depth_in_km * 1000.0
+            }
+        if missed_events:
+            print("Skipped origins of %i events as the corresponding events "
+                  "are not part of the database." % len(missed_events))
+
+        # Finally make sure all events have origins.
+        x_o = [
+            ev for ev, value in self._events.items() if not value["origins"]]
+        assert not x_o
 
     def get_unique_channels(self):
         return set((_i[1].station.upper(),
