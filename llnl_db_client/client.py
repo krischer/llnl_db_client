@@ -214,6 +214,7 @@ class LLNLDBClient(object):
             ("latitude", (0, 9), float),
             ("longitude", (10, 18), float),
             ("depth_in_km", (19, 29), float),
+            ("origin_time", (30, 47), float),
             ("event_id", (58, 66), int),
             ("agency", (193, 207), str)
         ]
@@ -229,7 +230,8 @@ class LLNLDBClient(object):
             self._events[row.event_id]["origins"][row.agency] = {
                 "latitude": row.latitude,
                 "longitude": row.longitude,
-                "depth_in_m": row.depth_in_km * 1000.0
+                "depth_in_m": row.depth_in_km * 1000.0,
+                "origin_time": obspy.UTCDateTime(row.origin_time)
             }
         if missed_events:
             print("Skipped origins of %i events as the corresponding events "
