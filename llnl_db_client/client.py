@@ -21,6 +21,7 @@ import numpy as np
 import pandas as pd
 
 import obspy
+import obspy.core.event
 from obspy.core.compatibility import from_buffer
 
 from . import util
@@ -337,6 +338,49 @@ class LLNLDBClient(object):
                 all_files[inst.filename]))
 
         self.sensors = sensors
+
+    def get_obspy_event(self, event):
+        """
+        Convert a given event to an ObsPy event object.
+        """
+        event = self._events[event]
+
+        ev_obj = obspy.core.event.Event()
+
+        for key, origin in event["origins"].items():
+            org = obspy.core.event.Origin(
+                longitude=origin["longitude"],
+                latitude=origin["latitude"],
+                depth=origin["depth_in_m"],
+                time=origin["origin_time"],
+                creation_info=obspy.core.event.CreationInfo(agency_id=key)
+            )
+            ev_obj.origins.append(org)
+
+        # Make a random magnitude - just to be able to plot them with obspy.
+        ev_obj.magnitudes.append(obspy.core.event.Magnitude(
+            mag=1.0))
+
+        # Find one of the preferred origin ids, otherwise just give a random
+        # one.
+        for agency in ['ISC', 'PDE-M']:
+            for origin in ev_obj.origins:
+                if origin.creation_info.agency_id.lower() == agency.lower():
+                    ev_obj.preferred_origin_id = origin.resource_id
+                    break
+            else:
+                continue
+            break
+        else:
+            ev_obj.preferred_origin_id = ev_obj.origins[0].resource_id
+
+        return ev_obj
+
+    def get_catalog(self):
+        cat = obspy.core.event.Catalog()
+        for event in self.list_events():
+            cat.append(self.get_obspy_event(event))
+        return cat
 
     def remove_response(self, tr, output="VEL", water_level=60, pre_filt=None):
         """
