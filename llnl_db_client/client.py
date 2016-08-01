@@ -217,6 +217,10 @@ class LLNLDBClient(object):
             ("depth_in_km", (19, 29), float),
             ("origin_time", (30, 47), float),
             ("event_id", (58, 66), int),
+            ("body_wave_magnitude", (128, 136), float),
+            ("surface_wave_magnitude", (145, 152), float),
+            ("local_magnitude", (162, 169), float),
+            ("mlid", (170, 178), int),
             ("agency", (193, 207), str)
         ]
 
@@ -229,6 +233,9 @@ class LLNLDBClient(object):
                 continue
 
             self._events[row.event_id]["origins"][row.agency] = {
+                "body_wave_magnitude": row.body_wave_magnitude,
+                "surface_wave_magnitude": row.surface_wave_magnitude,
+                "local_magnitude": row.local_magnitude,
                 "latitude": row.latitude,
                 "longitude": row.longitude,
                 "depth_in_m": row.depth_in_km * 1000.0,
@@ -357,9 +364,25 @@ class LLNLDBClient(object):
             )
             ev_obj.origins.append(org)
 
-        # Make a random magnitude - just to be able to plot them with obspy.
-        ev_obj.magnitudes.append(obspy.core.event.Magnitude(
-            mag=1.0))
+            # Map to QuakeML shortcuts.
+            MAG_DICT = {
+                "body_wave_magnitude": "Mb",
+                "surface_wave_magnitude" : "MS",
+                "local_magnitude": "ML"}
+
+            for mag in ["body_wave_magnitude", "surface_wave_magnitude",
+                        "local_magnitude"]:
+                # Not set.
+                if origin[mag] < -100:
+                    continue
+                ev_obj.magnitudes.append(obspy.core.event.Magnitude(
+                    mag=origin[mag],
+                    magnitude_type=MAG_DICT[mag],
+                    origin_id=org.resource_id
+                ))
+
+        if not ev_obj.magnitudes:
+            raise Exception("Event does not have any magnitudes.")
 
         # Find one of the preferred origin ids, otherwise just give a random
         # one.
