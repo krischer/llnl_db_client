@@ -378,7 +378,7 @@ class LLNLDBClient(object):
                 ev_obj.magnitudes.append(obspy.core.event.Magnitude(
                     mag=origin[mag],
                     magnitude_type=MAG_DICT[mag],
-                    origin_id=org.resource_id
+                    origin_id=str(org.resource_id.resource_id)
                 ))
 
         if not ev_obj.magnitudes:
@@ -389,13 +389,15 @@ class LLNLDBClient(object):
         for agency in ['ISC', 'PDE-M']:
             for origin in ev_obj.origins:
                 if origin.creation_info.agency_id.lower() == agency.lower():
-                    ev_obj.preferred_origin_id = origin.resource_id
+                    ev_obj.preferred_origin_id = str(
+                        origin.resource_id.resource_id)
                     break
             else:
                 continue
             break
         else:
-            ev_obj.preferred_origin_id = ev_obj.origins[0].resource_id
+            ev_obj.preferred_origin_id = str(ev_obj.origins[
+                                                 0].resource_id.resource_id)
 
         return ev_obj
 
