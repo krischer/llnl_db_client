@@ -1,5 +1,7 @@
 # LLNL Database Client
 
+Currently private as I'm not sure if I can distribute this.
+
 
 ### Installation
 
