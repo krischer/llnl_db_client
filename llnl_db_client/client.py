@@ -381,9 +381,6 @@ class LLNLDBClient(object):
                     origin_id=str(org.resource_id.resource_id)
                 ))
 
-        if not ev_obj.magnitudes:
-            raise Exception("Event does not have any magnitudes.")
-
         # Find one of the preferred origin ids, otherwise just give a random
         # one.
         for agency in ['ISC', 'PDE-M']:
