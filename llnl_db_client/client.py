@@ -383,7 +383,9 @@ class LLNLDBClient(object):
 
         # Find one of the preferred origin ids, otherwise just give a random
         # one.
-        for agency in ['ISC', 'PDE-M']:
+        # for agency in ['ISC', 'PDE-M']:   # original code
+        # full list of agencies from the LLNL database
+        for agency in ['DOE_Springer', 'CNSS', 'DEWEY_USMINES', 'LLNL_GT', 'PDE-M', 'UNR_2000_2001', 'UNR_2002present', 'UNR_SGB_reloc',  'Weston_BlMesa']:
             for origin in ev_obj.origins:
                 if origin.creation_info.agency_id.lower() == agency.lower():
                     ev_obj.preferred_origin_id = str(
