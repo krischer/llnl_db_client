@@ -350,9 +350,13 @@ class LLNLDBClient(object):
         """
         Convert a given event to an ObsPy event object.
         """
+        event_id = event
         event = self._events[event]
 
         ev_obj = obspy.core.event.Event()
+
+        ev_obj.event_descriptions.append(obspy.core.event.EventDescription(
+            str(event_id), type="earthquake name"))
 
         for key, origin in event["origins"].items():
             org = obspy.core.event.Origin(
