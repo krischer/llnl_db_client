@@ -50,6 +50,8 @@ class LLNLDBClient(object):
         self._parse_sitechan_file()
         self._parse_events()
         self._parse_sensor_information()
+        self._parse_arrival_file()
+        self._parse_assoc_file()
 
     def __str__(self):
         ret_str = "LLNL Database '%s' (%s)\n" % (self._db_name, self._basedir)
@@ -173,6 +175,61 @@ class LLNLDBClient(object):
     def plot_stations(self):
         self.get_inventory().plot(projection="local")
 
+    def _parse_assoc_file(self):
+        definition = [
+            ("arrival id", (0, 8), int),
+            ("origin id", (9, 17), int),
+            ("station", (18, 24), str),
+            ("associated phase", (25, 33), str),
+            ("phase confidence", (34, 38), float),
+            ("station to event distance", (39, 47), float),
+            ("station to event azimuth", (48, 55), float),
+            ("event to station azimuth", (56, 63), float),
+            ("time residual", (64, 72), float),
+            ("time = defining, non-defining", (73, 74), str),
+            ("azimuth residual", (75, 82), float),
+            ("azimuth = defining, non-defining", (83, 84), str),
+            ("slowness residual", (85, 92), float),
+            ("slowness = defining, non-defining", (93, 94), str),
+            ("incidence angle residual", (95, 102), float),
+            ("location weight", (103, 109), float),
+            ("velocity model", (110, 125), str),
+            ("comment id", (126, 134), int),
+            ("(epoch) time of last record modification", (135, 152), str)]
+        self._dataframes["assoc"] = \
+            util.to_dataframe(self._files["assoc"], definition)
+
+    def _parse_arrival_file(self):
+        definition = [
+            ("station", (0, 6), str),
+            ("epoch time", (7, 24), float),
+            ("arrival id", (25, 33), int),
+            ("julian date", (34, 42), int),
+            ("stassoc id", (43, 51), int),
+            ("channel operation id", (52, 60), int),
+            ("channel", (61, 69), str),
+            ("reported phase", (70, 78), str),
+            ("signal type", (79, 80), str),
+            ("delta time", (81, 87), float),
+            ("observed azimuth", (88, 95), float),
+            ("delta azimuth", (96, 103), float),
+            ("observed slowness (s/deg)", (104, 111), float),
+            ("delta slowness", (112, 119), float),
+            ("emergence angle", (120, 127), float),
+            ("rectilinearity", (128, 135), float),
+            ("amplitude, infloat corrected, nm", (136, 146), float),
+            ("period", (147, 154), float),
+            ("log(amp/per)", (155, 162), float),
+            ("clipped flag", (163, 164), str),
+            ("first motion", (165, 167), str),
+            ("signal to noise ratio", (168, 178), float),
+            ("signal onset quality", (179, 180), str),
+            ("source/originator", (181, 196), str),
+            ("comment id", (197, 205), int),
+            ("(epoch) time of last record modification", (206, 223), str)]
+        self._dataframes["arrival"] = \
+            util.to_dataframe(self._files["arrival"], definition)
+
     def _parse_sitechan_file(self):
         """
         Parse the site chan file.
@@ -275,6 +332,7 @@ class LLNLDBClient(object):
             ("longitude", (10, 18), float),
             ("depth_in_km", (19, 29), float),
             ("origin_time", (30, 47), float),
+            ("origin_id", (48, 56), int),
             ("event_id", (58, 66), int),
             ("body_wave_magnitude", (128, 136), float),
             ("surface_wave_magnitude", (145, 152), float),
@@ -292,6 +350,7 @@ class LLNLDBClient(object):
                 continue
 
             self._events[row.event_id]["origins"][row.agency] = {
+                "origin_id": row.origin_id,
                 "body_wave_magnitude": row.body_wave_magnitude,
                 "surface_wave_magnitude": row.surface_wave_magnitude,
                 "local_magnitude": row.local_magnitude,
@@ -331,6 +390,7 @@ class LLNLDBClient(object):
             data.byteswap(True)
 
             tr = obspy.Trace(data=data)
+            tr.stats.network = "LL"
             tr.stats.station = wf.station
             tr.stats.sampling_rate = wf.sampling_rate
             tr.stats.starttime = wf.starttime
@@ -417,6 +477,11 @@ class LLNLDBClient(object):
         ev_obj.event_descriptions.append(obspy.core.event.EventDescription(
             str(event_id), type="earthquake name"))
 
+        assoc = self._dataframes["assoc"]
+        arr = self._dataframes["arrival"]
+
+        picks = {}
+
         for key, origin in event["origins"].items():
             org = obspy.core.event.Origin(
                 longitude=origin["longitude"],
@@ -443,6 +508,48 @@ class LLNLDBClient(object):
                     magnitude_type=mag_dict[mag],
                     origin_id=str(org.resource_id.resource_id)
                 ))
+
+            # Multi-step process - we first find all arrivals associations
+            # for the given origin.
+            _a = assoc[assoc["origin id"] == origin["origin_id"]]
+            if _a.empty:
+                continue
+            # Now find the arrival for the given association.
+            for _, _assoc in _a.iterrows():
+                _arr_id = int(_assoc["arrival id"])
+                _arr = arr[arr["arrival id"] == _arr_id]
+                if _arr.empty:
+                    continue
+                if len(_arr) != 1:
+                    raise
+
+                # If the pick already exists - use it.
+                if _arr_id in picks:
+                    p = picks[_arr_id]
+                # Otherwise create it.
+                else:
+                    pick_time = obspy.UTCDateTime(float(_arr["epoch time"]))
+                    wf_id = obspy.core.event.base.WaveformStreamID(
+                        network_code="LL",
+                        station_code=_arr["station"].tolist()[0],
+                        location_code="",
+                        channel_code=_arr["channel"].tolist()[0])
+                    phase = _arr["reported phase"].tolist()[0]
+
+                    p = obspy.core.event.Pick(
+                        time=pick_time,
+                        waveform_id=wf_id,
+                        phase_hint=phase)
+                    picks[_arr_id] = p
+                    ev_obj.picks.append(p)
+
+                # We now use this pick and with the assoc create a new
+                # arrival - the terminoloy of the database differs a bit
+                # with QuakeML - don't be confused ^^
+                a = obspy.core.event.Arrival(
+                    pick_id=p.resource_id,
+                    phase=p.phase_hint)
+                org.arrivals.append(a)
 
         # Find one of the preferred origin ids, otherwise just give a random
         # one.
