@@ -47,6 +47,7 @@ class LLNLDBClient(object):
         self._assemble_filenames()
         self._parse_wf_disc_file()
         self._parse_site_file()
+        self._parse_sitechan_file()
         self._parse_events()
         self._parse_sensor_information()
 
@@ -119,20 +120,78 @@ class LLNLDBClient(object):
 
     def get_inventory(self):
         _t = self._dataframes["site"]
+        _sc = self._dataframes["sitechan"]
 
         net = obspy.core.inventory.Network(code="LL")
         inv = obspy.core.inventory.Inventory(networks=[net], source="")
         for _, sta in _t.iterrows():
+            latitude = sta["latitude"]
+            longitude = sta["longitude"]
+            elevation = sta["elevation_in_km"] * 1000.0
+
+            # Get all channels for that station.
+            channels = []
+            chas = _sc[_sc["station"] == sta["code"]]
+            for c in chas.iterrows():
+                c = c[1]
+
+                azimuth = c.azimuth
+                # The azimuth of the files for vertical channels is always
+                # set to -1. StationXML uses 0 for that thus we patch it
+                # here. But the azimuth for vertical channels is not really
+                # defined in any case.
+                if azimuth == -1.0 and c.dip == 0:
+                    azimuth = 0
+                # Make sure its always in range.
+                azimuth %= 360
+
+                # The dip is apparently defined as angle against the
+                # vertical axis. SEED defines it as angle against the ground.
+                dip = c.dip
+                dip -= 90.0
+
+                channels.append(obspy.core.inventory.channel.Channel(
+                    code=c.channel,
+                    location_code="",  # XXX: Cannot find the location.
+                    latitude=latitude,
+                    longitude=longitude,
+                    elevation=elevation,
+                    # Its in kilometer!
+                    depth=c.emplacement_depth * 1000,
+                    azimuth=azimuth,
+                    dip=dip))
+
             net.stations.append(
                 obspy.core.inventory.Station(
                     code=sta["code"],
-                    latitude=sta["latitude"],
-                    longitude=sta["longitude"],
-                    elevation=sta["elevation_in_km"] * 1000.0))
+                    latitude=latitude,
+                    longitude=longitude,
+                    elevation=elevation,
+                    channels=channels))
         return inv
 
     def plot_stations(self):
         self.get_inventory().plot(projection="local")
+
+    def _parse_sitechan_file(self):
+        """
+        Parse the site chan file.
+        """
+        definition = [
+            ("station", (0, 6), str),
+            ("channel", (7, 15), str),
+            ("julday_start", (16, 24), int),
+            ("channel_operation_id", (25, 33), int),
+            ("julday_end", (34, 42), int),
+            ("channel_type", (43, 47), str),
+            ("emplacement_depth", (48, 57), float),
+            ("azimuth", (58, 64), float),
+            ("dip", (65, 71), float),
+            ("channel_description", (72, 122), str),
+            ("last_modified", (123, 140), str)
+        ]
+        self._dataframes["sitechan"] = \
+            util.to_dataframe(self._files["sitechan"], definition)
 
     def _parse_site_file(self):
         """
