@@ -323,7 +323,7 @@ class LLNLDBClient(object):
                 "unknown_c": ev.unknown_c,
                 "date": ev.date,
                 "waveform_ids": list(tags[tags.id == ev_id].waveform_id),
-                "origins": {}
+                "origins": collections.OrderedDict()
             }
 
         # Also parse all the origins.
