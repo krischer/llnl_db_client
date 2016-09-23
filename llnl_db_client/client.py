@@ -428,9 +428,9 @@ class LLNLDBClient(object):
             ev_obj.origins.append(org)
 
             # Map to QuakeML shortcuts.
-            MAG_DICT = {
+            mag_dict = {
                 "body_wave_magnitude": "Mb",
-                "surface_wave_magnitude" : "MS",
+                "surface_wave_magnitude": "MS",
                 "local_magnitude": "ML"}
 
             for mag in ["body_wave_magnitude", "surface_wave_magnitude",
@@ -440,7 +440,7 @@ class LLNLDBClient(object):
                     continue
                 ev_obj.magnitudes.append(obspy.core.event.Magnitude(
                     mag=origin[mag],
-                    magnitude_type=MAG_DICT[mag],
+                    magnitude_type=mag_dict[mag],
                     origin_id=str(org.resource_id.resource_id)
                 ))
 
@@ -448,7 +448,9 @@ class LLNLDBClient(object):
         # one.
         # for agency in ['ISC', 'PDE-M']:   # original code
         # full list of agencies from the LLNL database
-        for agency in ['DOE_Springer', 'CNSS', 'DEWEY_USMINES', 'LLNL_GT', 'PDE-M', 'UNR_2000_2001', 'UNR_2002present', 'UNR_SGB_reloc',  'Weston_BlMesa']:
+        for agency in ['DOE_Springer', 'CNSS', 'DEWEY_USMINES', 'LLNL_GT',
+                       'PDE-M', 'UNR_2000_2001', 'UNR_2002present',
+                       'UNR_SGB_reloc',  'Weston_BlMesa']:
             for origin in ev_obj.origins:
                 if origin.creation_info.agency_id.lower() == agency.lower():
                     ev_obj.preferred_origin_id = str(
