@@ -28,7 +28,9 @@ within the repository.
 
 ### Running the Tests
 
-This is currently only a regression test suite but it at least checks some things. You need the database to run the tests. `cd` to the `llnl_db_client` directory and run
+This is currently only a regression test suite but it checks some things and
+has 100% test coverage so at least the Python is correct. You need the
+database to run the tests. `cd` to the `llnl_db_client` directory and run
 
 ```bash
 $ LLNL_DB_PATH=/path/to/UCRL-MI-222502/westernus.wfdisc py.test
