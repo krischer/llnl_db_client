@@ -55,8 +55,8 @@ def test_get_waveforms(db):
         'LL.MNV..T', 'LL.MNV..V']
     assert st[0].stats.sampling_rate == 40.0
     assert st[0].stats.npts == 21002
-    assert st[0].stats.starttime == \
-        obspy.UTCDateTime(1982, 8, 5, 13, 57, 55, 86979)
+    assert abs(st[0].stats.starttime -
+               obspy.UTCDateTime(1982, 8, 5, 13, 57, 55, 86979)) < 1E-5
     np.testing.assert_allclose(
         st[0].data[:10],
         np.array([-103., -106., -109., -112., -115., -118., -122., -124.,
@@ -65,13 +65,13 @@ def test_get_waveforms(db):
 
 def test_get_event(db):
     ev = db.get_obspy_event(1778048)
-    assert len(ev.origins, 4)
-    assert len(ev.picks, 9)
-    assert len(ev.magnitudes, 4)
+    assert len(ev.origins) == 4
+    assert len(ev.picks) == 9
+    assert len(ev.magnitudes) == 4
     assert ev.preferred_origin().latitude == 36.7293
     assert ev.preferred_origin().longitude == -116.297
-    assert ev.preferred_origin().time == \
-        obspy.UTCDateTime(1992, 7, 4, 5, 57, 30, 830000)
+    assert abs(ev.preferred_origin().time -
+               obspy.UTCDateTime(1992, 7, 4, 5, 57, 30, 830000)) < 1E-5
 
 
 def test_remove_response_does_something(db):
