@@ -17,7 +17,6 @@ import re
 import warnings
 
 import numpy as np
-import pandas as pd
 
 import obspy
 import obspy.core.event
