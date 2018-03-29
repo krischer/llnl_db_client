@@ -8,7 +8,8 @@ Assuming you use conda, run (in the correct `conda` environment):
 $ conda install -c conda-forge obspy pandas basemap pytest
 ```
 
-Assuming `ObsPy` and everything is installed, grab this repository with git, and install it with `pip`. Make sure to use the `-e` flag for an editable installation.
+Now grab this repository with git, and install it with `pip`. Make sure to
+use the `-e` flag for an editable installation.
 
 ```bash
 $ git clone https://github.com/krischer/llnl_db_client.git
