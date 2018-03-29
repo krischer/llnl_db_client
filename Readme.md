@@ -37,7 +37,10 @@ $ LLNL_DB_PATH=/path/to/UCRL-MI-222502/westernus.wfdisc py.test
 ### Potential Pitfalls
 
 * Essentially untested!
-* The reponses are a bit tricky, except the RESP files which are easy. The others follow this logic (**this might very well be wrong!!!**):
+* This is not a proper CSS reader and should at one point probably replaced by
+  something more solid, e.g. `obspy.io.css` or something else.
+* The reponses are a bit tricky, except the RESP files which are easy. The
+  others follow this logic (**this might very well be wrong!!!**):
 	* SACPZ files:
 		* The client currently assumes they correct to displacement in 10E-6 meters! The only justification I have is that this puts the amplitudes in the same ballpark as those corrected for with evalresp.
 	* Funky PAZ files:

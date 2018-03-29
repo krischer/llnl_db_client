@@ -84,40 +84,40 @@ class LLNLDBClient(object):
         """
         Partial copy of obspy.io.css.core._read_css
         """
-        with open(self._files["wfdisc"], "rt") as fh:
-            lines = fh.readlines()
+        definition = [
+            ("station", (0, 6), str),
+            ("channel", (7, 15), str),
+            ("starttime", (16, 33), lambda x: obspy.UTCDateTime(float(x))),
+            ("id", (35, 44), int),
+            ("unknown_b", (46, 51), int),
+            ("unknown_c", (53, 62), int),
+            ("unknown_d", (63, 80), float),
+            ("npts", (82, 87), int),
+            ("sampling_rate", (88, 99), float),
+            ("calib", (100, 116), float),
+            ("calper", (117, 133), float),
+            ("_dirname", (148, 212), str),
+            ("_filename", (213, 245), str)]
 
-        items = []
+        self._dataframes["wfdisc"] = \
+            util.to_dataframe(self._files["wfdisc"], definition)
 
-        for line in lines:
-            item = {}
+        files = []
+        for _, row in self._dataframes["wfdisc"].iterrows():
+            _f = os.path.join(self._basedir, row["_dirname"], row["_filename"])
+            files.append(_f)
+        exists = [_i for _i, _j in enumerate(files) if not os.path.exists(_j)]
 
-            item["station"] = line[0:6].strip()
-            item["channel"] = line[7:15].strip()
-            item["starttime"] = obspy.UTCDateTime(float(line[16:33]))
+        self._dataframes["wfdisc"]["filename"] = files
 
-            item["id"] = int(line[35:44].strip())
-            item["unknown_b"] = int(line[46:51].strip())
-            item["unknown_c"] = int(line[53:62].strip())
-            item["unknown_d"] = float(line[63:80].strip())
+        for _i in exists:
+            msg = ("File '%s' does not exists. "
+                   "Will not be accessible via the client.") % \
+                   self._dataframes["wfdisc"]["filename"][_i]
+            warnings.warn(msg)
 
-            item["npts"] = int(line[82:87])
-            item["sampling_rate"] = float(line[88:99])
-            item["calib"] = float(line[100:116])
-            item["calper"] = float(line[117:133])
-
-            dirname = line[148:212].strip()
-            filename = line[213:245].strip()
-            item["filename"] = os.path.join(self._basedir, dirname, filename)
-
-            if not os.path.exists(item["filename"]):
-                warnings.warn(
-                    "File '%s' does not exists. "
-                    "Will not be accessible via the client.", UserWarning)
-                continue
-            items.append(item)
-
-        self._dataframes["wfdisc"] = pd.DataFrame(items)
+        # Get rid of all non-existant files.
+        self._dataframes["wfdisc"].drop(exists, inplace=True)
 
     def get_inventory(self):
         _t = self._dataframes["site"]
