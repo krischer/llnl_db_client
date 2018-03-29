@@ -633,17 +633,17 @@ class LLNLDBClient(object):
                     if line.startswith("*"):
                         continue
 
-                    l = line.split()
-                    if l[0].upper() == "ZEROS":
+                    _l = line.split()
+                    if _l[0].upper() == "ZEROS":
                         cur_state = "ZEROS"
-                        num_zeros = int(l[1])
-                    elif l[0].upper() == "POLES":
+                        num_zeros = int(_l[1])
+                    elif _l[0].upper() == "POLES":
                         cur_state = "POLES"
-                        num_poles = int(l[1])
-                    elif l[0].upper() == "CONSTANT":
-                        constant = float(l[1])
+                        num_poles = int(_l[1])
+                    elif _l[0].upper() == "CONSTANT":
+                        constant = float(_l[1])
                     elif cur_state:
-                        v = float(l[0]) + float(l[1]) * 1j
+                        v = float(_l[0]) + float(_l[1]) * 1j
                         if cur_state == "ZEROS":
                             zeros.append(v)
                         elif cur_state == "POLES":
