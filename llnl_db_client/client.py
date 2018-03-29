@@ -156,6 +156,13 @@ class LLNLDBClient(object):
     def plot_stations(self):  # pragma: no cover
         self.get_inventory().plot(projection="local")
 
+    def plot_events(self):  # pragma: no cover
+        self.get_catalog().plot(projection="local")
+
+    def plot(self):  # pragma: no cover
+        fig = self.get_inventory().plot(projection="local", show=False)
+        self.get_catalog().plot(fig=fig)
+
     def _parse_events(self):
         # Step 1: Get list of events.
         with open(self._files["evids"], "rt") as fh:
