@@ -1,5 +1,8 @@
 # LLNL Database Client
 
+You need the actual database to use it. It can be requested from IRIS on this
+website: https://ds.iris.edu/mda/18-001
+
 ## Installation
 
 Assuming you use conda, run (in the correct `conda` environment):
