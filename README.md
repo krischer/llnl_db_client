@@ -46,7 +46,7 @@ $ LLNL_DB_PATH=/path/to/UCRL-MI-222502/westernus.wfdisc py.test
 * This is not a proper CSS reader and should at one point probably replaced by
   something more solid, e.g. `obspy.io.css` or something else.
 * The network code for all traces and the inventory information is always `LL`
-  which might not play nice with other tools. There appears to be no network
+  which might not play nice with other tools. There appear to be no network
   codes in the database so that is the best we can do.
 * The reponses are a bit tricky, except the RESP files which are easy. The
   others follow this logic (**this might very well be wrong!!!**):
@@ -54,6 +54,10 @@ $ LLNL_DB_PATH=/path/to/UCRL-MI-222502/westernus.wfdisc py.test
 		* The client currently assumes they correct to displacement in 10E-6 meters! The only justification I have is that this puts the amplitudes in the same ballpark as those corrected for with evalresp.
 	* Funky PAZ files:
 		* The client currently assumes they correct to displacement in 10E5 meters! The only justification I have is that this puts the amplitudes in the same ballpark as those corrected for with evalresp.
+* Aside from these "empirical corrections" some stations might require
+  additional corrections in the form of polarity flips or amplitude
+  corrections. Please see this academic collection for some choices and their
+  reasoning (https://scholarworks.alaska.edu/handle/11122/8007).
 
 ## Usage
 
