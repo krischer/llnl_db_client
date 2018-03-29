@@ -53,7 +53,7 @@ setup_config = dict(
         "llnl_db_client": get_package_data()},
     license='MIT',
     platforms="OS Independent",
-    install_requires=["obspy >= 1.1.0"],
+    install_requires=["obspy >= 1.1.0", "pandas"],
     classifiers=[
         # complete classifier list:
         # http://pypi.python.org/pypi?%3Aaction=list_classifiers

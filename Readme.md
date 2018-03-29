@@ -1,9 +1,12 @@
 # LLNL Database Client
 
-Currently private as I'm not sure if I can distribute this.
-
-
 ### Installation
+
+Assuming you use conda, run (in the correct `conda` environment):
+
+```bash
+$ conda install -c conda-forge obspy pandas basemap pytest
+```
 
 Assuming `ObsPy` and everything is installed, grab this repository with git, and install it with `pip`. Make sure to use the `-e` flag for an editable installation.
 
@@ -22,9 +25,18 @@ $ pip install -v -e .
 
 within the repository.
 
+
+### Running the Tests
+
+This is currently only a regression test suite but it at least checks some things. You need the database to run the tests. `cd` to the `llnl_db_client` directory and run
+
+```bash
+$ LLNL_DB_PATH=/path/to/UCRL-MI-222502/westernus.wfdisc py.test
+```
+
 ### Potential Pitfalls
 
-* Essentially untested.
+* Essentially untested!
 * The reponses are a bit tricky, except the RESP files which are easy. The others follow this logic (**this might very well be wrong!!!**):
 	* SACPZ files:
 		* The client currently assumes they correct to displacement in 10E-6 meters! The only justification I have is that this puts the amplitudes in the same ballpark as those corrected for with evalresp.
