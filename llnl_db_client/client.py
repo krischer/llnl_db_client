@@ -4,10 +4,9 @@
 Implementation of the client.
 
 :copyright:
-    Lion Krischer (krischer@geophysik.uni-muenchen.de), 2016
+    Lion Krischer (lion.krischer@gmail.com), 2018
 :license:
-    GNU Lesser General Public License, Version 3
-    (http://www.gnu.org/copyleft/lgpl.html)
+    MIT
 """
 from __future__ import absolute_import, division, print_function
 

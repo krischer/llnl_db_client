@@ -4,9 +4,9 @@ u"""
 LLNL Database Client for ObsPy.
 
 :copyright:
-    Lion Krischer (lion.krischer@gmail.com), 2016
+    Lion Krischer (lion.krischer@gmail.com), 2018
 :license:
-    BSD 3-Clause ("BSD New" or "BSD Simplified")
+    MIT
 """
 from setuptools import find_packages, setup
 
@@ -39,8 +39,6 @@ def get_package_data():
                     root_dir))
     return filenames
 
-INSTALL_REQUIRES = ["obspy >= 1.0.1"]
-
 
 setup_config = dict(
     name="llnl_db_client",
@@ -53,9 +51,9 @@ setup_config = dict(
     packages=find_packages(),
     package_data={
         "llnl_db_client": get_package_data()},
-    license='BSD 3-Clause ("BSD New" or "BSD Simplified")',
+    license='MIT',
     platforms="OS Independent",
-    install_requires=INSTALL_REQUIRES,
+    install_requires=["obspy >= 1.1.0"],
     classifiers=[
         # complete classifier list:
         # http://pypi.python.org/pypi?%3Aaction=list_classifiers
