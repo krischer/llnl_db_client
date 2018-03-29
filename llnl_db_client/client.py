@@ -22,7 +22,7 @@ import obspy
 import obspy.core.event
 from obspy.core.compatibility import from_buffer
 
-from . import util
+from . import tables, util
 
 
 class LLNLDBClient(object):
@@ -42,14 +42,10 @@ class LLNLDBClient(object):
 
         self._dataframes = {}
 
-        self._assemble_filenames()
-        self._parse_wf_disc_file()
-        self._parse_site_file()
-        self._parse_sitechan_file()
+        self._parse_tables()
+        self._check_wfdisc_files()
         self._parse_events()
         self._parse_sensor_information()
-        self._parse_arrival_file()
-        self._parse_assoc_file()
 
     def __str__(self):
         ret_str = "LLNL Database '%s' (%s)\n" % (self._db_name, self._basedir)
@@ -57,7 +53,7 @@ class LLNLDBClient(object):
         ret_str += "\t%i stations\n" % len(self._dataframes["site"])
         return ret_str
 
-    def _assemble_filenames(self):
+    def _parse_tables(self):
         """
         Create a simple dictionary containing all the various filenames and
         make sure they all exist.
@@ -79,28 +75,15 @@ class LLNLDBClient(object):
 
         self._files = files
 
-    def _parse_wf_disc_file(self):
-        """
-        Partial copy of obspy.io.css.core._read_css
-        """
-        definition = [
-            ("station", (0, 6), str),
-            ("channel", (7, 15), str),
-            ("starttime", (16, 33), lambda x: obspy.UTCDateTime(float(x))),
-            ("id", (35, 44), int),
-            ("unknown_b", (46, 51), int),
-            ("unknown_c", (53, 62), int),
-            ("unknown_d", (63, 80), float),
-            ("npts", (82, 87), int),
-            ("sampling_rate", (88, 99), float),
-            ("calib", (100, 116), float),
-            ("calper", (117, 133), float),
-            ("_dirname", (148, 212), str),
-            ("_filename", (213, 245), str)]
+        # Now read all the defined files.
+        for name, definition in tables.TABLES.items():
+            self._dataframes[name] = \
+                util.to_dataframe(self._files[name], definition)
 
-        self._dataframes["wfdisc"] = \
-            util.to_dataframe(self._files["wfdisc"], definition)
-
+    def _check_wfdisc_files(self):
+        """
+        Check if the files in the wfdisc table exist.
+        """
         files = []
         for _, row in self._dataframes["wfdisc"].iterrows():
             _f = os.path.join(self._basedir, row["_dirname"], row["_filename"])
@@ -173,103 +156,6 @@ class LLNLDBClient(object):
     def plot_stations(self):
         self.get_inventory().plot(projection="local")
 
-    def _parse_assoc_file(self):
-        definition = [
-            ("arrival id", (0, 8), int),
-            ("origin id", (9, 17), int),
-            ("station", (18, 24), str),
-            ("associated phase", (25, 33), str),
-            ("phase confidence", (34, 38), float),
-            ("station to event distance", (39, 47), float),
-            ("station to event azimuth", (48, 55), float),
-            ("event to station azimuth", (56, 63), float),
-            ("time residual", (64, 72), float),
-            ("time = defining, non-defining", (73, 74), str),
-            ("azimuth residual", (75, 82), float),
-            ("azimuth = defining, non-defining", (83, 84), str),
-            ("slowness residual", (85, 92), float),
-            ("slowness = defining, non-defining", (93, 94), str),
-            ("incidence angle residual", (95, 102), float),
-            ("location weight", (103, 109), float),
-            ("velocity model", (110, 125), str),
-            ("comment id", (126, 134), int),
-            ("(epoch) time of last record modification", (135, 152), str)]
-        self._dataframes["assoc"] = \
-            util.to_dataframe(self._files["assoc"], definition)
-
-    def _parse_arrival_file(self):
-        definition = [
-            ("station", (0, 6), str),
-            ("epoch time", (7, 24), float),
-            ("arrival id", (25, 33), int),
-            ("julian date", (34, 42), int),
-            ("stassoc id", (43, 51), int),
-            ("channel operation id", (52, 60), int),
-            ("channel", (61, 69), str),
-            ("reported phase", (70, 78), str),
-            ("signal type", (79, 80), str),
-            ("delta time", (81, 87), float),
-            ("observed azimuth", (88, 95), float),
-            ("delta azimuth", (96, 103), float),
-            ("observed slowness (s/deg)", (104, 111), float),
-            ("delta slowness", (112, 119), float),
-            ("emergence angle", (120, 127), float),
-            ("rectilinearity", (128, 135), float),
-            ("amplitude, infloat corrected, nm", (136, 146), float),
-            ("period", (147, 154), float),
-            ("log(amp/per)", (155, 162), float),
-            ("clipped flag", (163, 164), str),
-            ("first motion", (165, 167), str),
-            ("signal to noise ratio", (168, 178), float),
-            ("signal onset quality", (179, 180), str),
-            ("source/originator", (181, 196), str),
-            ("comment id", (197, 205), int),
-            ("(epoch) time of last record modification", (206, 223), str)]
-        self._dataframes["arrival"] = \
-            util.to_dataframe(self._files["arrival"], definition)
-
-    def _parse_sitechan_file(self):
-        """
-        Parse the site chan file.
-        """
-        definition = [
-            ("station", (0, 6), str),
-            ("channel", (7, 15), str),
-            ("julday_start", (16, 24), int),
-            ("channel_operation_id", (25, 33), int),
-            ("julday_end", (34, 42), int),
-            ("channel_type", (43, 47), str),
-            ("emplacement_depth", (48, 57), float),
-            ("azimuth", (58, 64), float),
-            ("dip", (65, 71), float),
-            ("channel_description", (72, 122), str),
-            ("last_modified", (123, 140), str)
-        ]
-        self._dataframes["sitechan"] = \
-            util.to_dataframe(self._files["sitechan"], definition)
-
-    def _parse_site_file(self):
-        """
-        Parse the site file.
-        """
-        definition = [
-            ("code", (0, 7), str),
-            ("unknown_a", (8, 16), int),
-            ("unknown_b", (17, 26), int),
-            ("latitude", (27, 34), float),
-            ("longitude", (35, 46), float),
-            ("elevation_in_km", (47, 54), float),
-            ("description", (55, 105), str),
-            ("unknown_c", (106, 110), str),
-            ("code_2", (111, 120), str),
-            ("unknown_d", (121, 130), float),
-            ("unknown_e", (131, 137), float),
-            ("date", (138, 148), str)
-        ]
-
-        self._dataframes["site"] = \
-            util.to_dataframe(self._files["site"], definition)
-
     def _parse_events(self):
         # Step 1: Get list of events.
         with open(self._files["evids"], "rt") as fh:
@@ -283,27 +169,10 @@ class LLNLDBClient(object):
 
         assert set(event_type.keys()) == event_ids
 
-        # Step 3: Parse the event file.
-        definition = [
-            ("event_id", (0, 8), int),
-            ("location", (9, 25), str),
-            ("unknown_a", (26, 33), int),
-            ("unknown_b", (34, 55), str),
-            ("unknown_c", (56, 58), int),
-            ("date", (59, 70), str)
-        ]
-
-        event_info = util.to_dataframe(self._files["event"], definition)
+        event_info = self._dataframes["event"]
         assert set(event_info["event_id"]) == event_ids
 
-        # Step 4: Parse the tags but only keep the event associations for now.
-        definition = [
-            ("type", (0, 4), str),
-            ("id", (6, 18), int),
-            ("waveform_id", (19, 26), int),
-            ("date", (27, 36), str)
-        ]
-        tags = util.to_dataframe(self._files["wftag"], definition)
+        tags = self._dataframes["wftag"]
         tags = tags[tags.type == "evid"]
 
         # Make sure all events have associations.
@@ -324,22 +193,7 @@ class LLNLDBClient(object):
                 "origins": collections.OrderedDict()
             }
 
-        # Also parse all the origins.
-        definition = [
-            ("latitude", (0, 9), float),
-            ("longitude", (10, 18), float),
-            ("depth_in_km", (19, 29), float),
-            ("origin_time", (30, 47), float),
-            ("origin_id", (48, 56), int),
-            ("event_id", (58, 66), int),
-            ("body_wave_magnitude", (128, 136), float),
-            ("surface_wave_magnitude", (145, 152), float),
-            ("local_magnitude", (162, 169), float),
-            ("mlid", (170, 178), int),
-            ("agency", (193, 207), str)
-        ]
-
-        origins = util.to_dataframe(self._files["origin"], definition)
+        origins = self._dataframes["origin"]
         missed_events = set()
         for i, row in origins.iterrows():
             # The database is just really incomplete :-(
@@ -403,42 +257,11 @@ class LLNLDBClient(object):
         return list(self._events.keys())
 
     def _parse_sensor_information(self):
-        # Step 1: Parse the sensor file - we just need this to get the
-        # instrument id for each channel.
-        definition = [
-            ("station", (0, 6), str),
-            ("channel", (7, 14), str),
-            ("starttime", (15, 33), lambda x: obspy.UTCDateTime(float(x))),
-            ("endtime", (34, 52), lambda x: obspy.UTCDateTime(float(x))),
-            ("instrument_id", (53, 61), int),
-            ("unknown_c", (62, 70), int),
-            ("unknown_d", (71, 82), int),
-            ("unknown_e", (83, 101), float),
-            ("unknown_f", (102, 113), float),
-            ("unknown_g", (114, 119), float),
-            ("unknown_h", (120, 121), str),
-            ("date", (122, 132), str)
-        ]
-        sensor = util.to_dataframe(self._files["sensor"], definition)
+        sensor = self._dataframes["sensor"]
 
         # Step 2: Parse the instrument information to get the filename and the
         # type of response.
-        definition = [
-            ("id", (0, 8), int),
-            ("description", (9, 58), str),
-            ("unknown_a", (59, 61), str),
-            ("unknown_b", (62, 66), str),
-            ("unknown_c", (67, 68), str),
-            ("unknown_d", (69, 70), str),
-            ("unknown_e", (71, 86), float),
-            ("unknown_f", (87, 105), float),
-            ("unknown_g", (106, 116), float),
-            ("unknown_h", (117, 180), str),
-            ("filename", (181, 213), str),
-            ("response_type", (214, 221), str),
-            ("data", (222, 232), str)
-        ]
-        instrument = util.to_dataframe(self._files["instrument"], definition)
+        instrument = self._dataframes["instrument"]
 
         # Step 3: Find the actual filenames of all responses and match.
         responses_dir = os.path.join(self._basedir, "responses")
