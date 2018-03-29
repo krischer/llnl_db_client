@@ -92,7 +92,7 @@ class LLNLDBClient(object):
 
         self._dataframes["wfdisc"]["filename"] = files
 
-        for _i in exists:
+        for _i in exists:  # pragma: no cover
             msg = ("File '%s' does not exists. "
                    "Will not be accessible via the client.") % \
                    self._dataframes["wfdisc"]["filename"][_i]
@@ -153,7 +153,7 @@ class LLNLDBClient(object):
                     channels=channels))
         return inv
 
-    def plot_stations(self):
+    def plot_stations(self):  # pragma: no cover
         self.get_inventory().plot(projection="local")
 
     def _parse_events(self):
@@ -196,8 +196,8 @@ class LLNLDBClient(object):
         origins = self._dataframes["origin"]
         missed_events = set()
         for i, row in origins.iterrows():
-            # The database is just really incomplete :-(
-            if row.event_id not in event_ids:
+            # Safety measure.
+            if row.event_id not in event_ids:  # pragma: no cover
                 missed_events.add(row.event_id)
                 continue
 
@@ -211,7 +211,7 @@ class LLNLDBClient(object):
                 "depth_in_m": row.depth_in_km * 1000.0,
                 "origin_time": obspy.UTCDateTime(row.origin_time)
             }
-        if missed_events:
+        if missed_events:  # pragma: no cover
             print("Skipped origins of %i events as the corresponding events "
                   "are not part of the database." % len(missed_events))
 
@@ -339,13 +339,14 @@ class LLNLDBClient(object):
             for _, _assoc in _a.iterrows():
                 _arr_id = int(_assoc["arrival id"])
                 _arr = arr[arr["arrival id"] == _arr_id]
-                if _arr.empty:
+                if _arr.empty:  # pragma: no cover
                     continue
-                if len(_arr) != 1:
-                    raise
+                if len(_arr) != 1:  # pragma: no cover
+                    raise NotImplementedError
 
-                # If the pick already exists - use it.
-                if _arr_id in picks:
+                # If the pick already exists - use it. Should not really happen
+                # but who knows.
+                if _arr_id in picks:  # pragma: no cover
                     p = picks[_arr_id]
                 # Otherwise create it.
                 else:
@@ -438,7 +439,7 @@ class LLNLDBClient(object):
         for epoch in sensor:
             if epoch.starttime <= time <= epoch.endtime:
                 break
-        else:
+        else:  # pragma: no cover
             raise ValueError("Found some responses for the channel but not "
                              "for the correct time span.")
 
@@ -452,7 +453,7 @@ class LLNLDBClient(object):
                 zeros = []
                 for line in fh:
                     line = line.strip()
-                    if line.startswith("*"):
+                    if line.startswith("*"):  # pragma: no cover
                         continue
 
                     _l = line.split()
@@ -470,9 +471,9 @@ class LLNLDBClient(object):
                             zeros.append(v)
                         elif cur_state == "POLES":
                             poles.append(v)
-                        else:
+                        else:  # pragma: no cover
                             raise NotImplementedError
-                    else:
+                    else:  # pragma: no cover
                         raise NotImplementedError
 
             assert len(poles) == num_poles, "sacpz parsing error"
@@ -497,7 +498,7 @@ class LLNLDBClient(object):
             elif output == "ACC":
                 paz["zeros"].append(0 + 0j)
                 paz["zeros"].append(0 + 0j)
-            else:
+            else:  # pragma: no cover
                 raise NotImplementedError
 
             tr.simulate(paz_remove=paz, water_level=water_level,
@@ -506,11 +507,18 @@ class LLNLDBClient(object):
 
         # Case 2: RESP files.
         elif epoch.response_type == "evresp":
-            tr.simulate(seedresp={"units": output,
-                                  "filename": epoch.filename},
-                        water_level=water_level,
-                        zero_mean=False, taper=False,
-                        pre_filt=pre_filt)
+            # Overwrite network temporarily so evalresp works as expected.
+            original_network = tr.stats.network
+            network_code = os.path.basename(epoch.filename).split(".")[1]
+            tr.stats.network = network_code
+            try:
+                tr.simulate(seedresp={"units": output,
+                                      "filename": epoch.filename},
+                            water_level=water_level,
+                            zero_mean=False, taper=False,
+                            pre_filt=pre_filt)
+            finally:
+                tr.stats.network = original_network
 
         # Case 3: Funky response/paz files.
         elif epoch.response_type == "paz":
@@ -541,7 +549,7 @@ class LLNLDBClient(object):
                         cur_status = "poles"
                     elif cur_status == "poles":
                         cur_status = "zeros"
-                    else:
+                    else:  # pragma: no cover
                         raise NotImplementedError
                     continue
                 elif len(line) == 4:
@@ -550,9 +558,9 @@ class LLNLDBClient(object):
                         cur_set["poles"].append(v)
                     elif cur_status == "zeros":
                         cur_set["zeros"].append(v)
-                    else:
+                    else:  # pragma: no cover
                         raise NotImplementedError
-                else:
+                else:  # pragma: no cover
                     raise NotImplementedError
 
             paz = paz_sets[0]
@@ -576,13 +584,13 @@ class LLNLDBClient(object):
             elif output == "ACC":
                 paz["zeros"].append(0 + 0j)
                 paz["zeros"].append(0 + 0j)
-            else:
+            else:  # pragma: no cover
                 raise NotImplementedError
 
             tr.simulate(paz_remove=paz, water_level=water_level,
                         zero_mean=False, taper=False,
                         pre_filt=pre_filt)
-        else:
+        else:  # pragma: no cover
             raise NotImplementedError(
                 "Unknown response type '%s' for file '%s'." % (
                     epoch.response_type, epoch.filename))
